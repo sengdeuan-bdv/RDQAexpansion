@@ -1,492 +1,514 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Upload, Users, FileText, Percent, AlertCircle, CheckCircle, ArrowRight, Languages } from 'lucide-react';
-
-// --- Translations ---
-const t = {
-  en: {
-    title: "Pre/Post Test Analysis Dashboard (RDQA)",
-    uploadData: "Upload Excel Data",
-    uploadDesc: "Click the button below to select your Excel file",
-    filters: "Filters",
-    allProvinces: "All Provinces",
-    allMonths: "All Months",
-    province: "Province",
-    month: "Month",
-    kpiTotal: "Total Responses",
-    kpiGender: "Gender Breakdown",
-    kpiTestType: "Pre / Post Breakdown",
-    kpiScore: "Average Score",
-    male: "Male",
-    female: "Female",
-    preTest: "Pre-test",
-    postTest: "Post-test",
-    chartTitle: "Score Comparison by Question (Pre vs Post %)",
-    tableTitle: "Detailed Analysis by Question",
-    qCode: "Q. Code",
-    questionDesc: "Question Description",
-    preScore: "Pre Score",
-    postScore: "Post Score",
-    diff: "Improvement",
-    weaknessesTitle: "Top 3 Weaknesses & Recommendations for Field Supervision",
-    recommendationAction: "Action / Recommendation:",
-    recs: [
-      "Provide refresher training and practical exercises.",
-      "Include this specific topic in the next field supportive supervision checklist.",
-      "Identify the root cause during the next site visit and mentor staff on-site."
-    ]
-  },
-  lo: {
-    title: "ແດຊບອດວິເຄາະຜົນການປະເມີນ ກ່ອນ-ຫຼັງ (RDQA)",
-    uploadData: "ອັບໂຫຼດຂໍ້ມູນ Excel",
-    uploadDesc: "ກົດປຸ່ມດ້ານລຸ່ມເພື່ອເລືອກໄຟລ໌ Excel ຂອງທ່ານ",
-    filters: "ຕົວຕອງຂໍ້ມູນ",
-    allProvinces: "ທຸກແຂວງ",
-    allMonths: "ທຸກເດືອນ",
-    province: "ແຂວງ",
-    month: "ເດືອນ",
-    kpiTotal: "ຈຳນວນຜູ້ຕອບທັງໝົດ",
-    kpiGender: "ແຍກຕາມເພດ",
-    kpiTestType: "ແຍກກ່ອນ ແລະ ຫຼັງ",
-    kpiScore: "ຄະແນນສະເລ່ຍ",
-    male: "ຊາຍ",
-    female: "ຍິງ",
-    preTest: "Pre-test",
-    postTest: "Post-test",
-    chartTitle: "ປຽບທຽບຄະແນນແຕ່ລະຄຳຖາມ (ກ່ອນ ແລະ ຫຼັງ ເປັນ %)",
-    tableTitle: "ຕາຕະລາງວິເຄາະລາຍລະອຽດແຕ່ລະຄຳຖາມ",
-    qCode: "ລະຫັດ",
-    questionDesc: "ເນື້ອໃນຄຳຖາມ",
-    preScore: "ກ່ອນ (Pre)",
-    postScore: "ຫຼັງ (Post)",
-    diff: "ການພັດທະນາ",
-    weaknessesTitle: "3 ຈຸດອ່ອນທີ່ຄວນປັບປຸງ ແລະ ຄຳແນະນຳສຳລັບລົງຊຸກຍູ້ພາກສະໜາມ",
-    recommendationAction: "ຂໍ້ແນະນຳ / ສິ່ງທີ່ຕ້ອງເຮັດ:",
-    recs: [
-      "ຈັດຝຶກອົບຮົມທົບທວນຄືນ (Refresher training) ແລະ ເຮັດບົດຝຶກຫັດຕົວຈິງຫຼາຍຂຶ້ນ.",
-      "ເພີ່ມຫົວຂໍ້ນີ້ເຂົ້າໃນໃບກວດກາ (Checklist) ສຳລັບການລົງຊຸກຍູ້ພາກສະໜາມຄັ້ງຕໍ່ໄປ.",
-      "ຊອກຫາສາເຫດຫຼັກໃນເວລາລົງພາກສະໜາມ ແລະ ແນະນຳພະນັກງານແບບຈັບມືເຮັດ (On-site mentoring)."
-    ]
-  }
-};
-
-// --- Question Mapping ---
-const questionsMap = {
-  cal1: { en: "1. What is the main purpose of RDQA?", lo: "1. ຈຸດປະສົງຫຼັກຂອງ RDQA ແມ່ນຫຍັງ?" },
-  cal2: { en: "2. If you see a #SPILL! error in a cell, what is the most likely cause?", lo: "2. ຖ້າເຫັນຂໍ້ຜິດພາດ #SPILL! ໃນຊ່ອງ, ສາເຫດທີ່ເປັນໄປໄດ້ທີ່ສຸດແມ່ນຫຍັງ?" },
-  cal3: { en: "3. Who should lead the action to address issue in RDQA?", lo: "3. ໃຜຄວນເປັນຜູ້ນຳໃນການແກ້ໄຂບັນຫາໃນ RDQA?" },
-  cal4: { en: "4. Data verification compares:", lo: "4. ການກວດສອບຂໍ້ມູນປຽບທຽບລະຫວ່າງ:" },
-  cal5: { en: "5. Which of the following is NOT a data quality dimension?", lo: "5. ຂໍ້ໃດຕໍ່ໄປນີ້ບໍ່ແມ່ນມິຕິຄຸນນະພາບຂໍ້ມູນ?" },
-  cal6: { en: "6. The RDQA checklist is used to assess:", lo: "6. ໃບກວດກາ RDQA ຖືກນຳໃຊ້ເພື່ອປະເມີນຫຍັງ?" },
-  cal7: { en: "7. In RDQA, data consistency refers to:", lo: "7. ໃນ RDQA, ຄວາມສອດຄ່ອງຂອງຂໍ້ມູນໝາຍເຖິງຫຍັງ?" },
-  cal8: { en: "8. What is the most appropriate action when source documents are missing?", lo: "8. ສິ່ງທີ່ຄວນເຮັດທີ່ສຸດເມື່ອເອກະສານອ້າງອີງສູນຫາຍແມ່ນຫຍັງ?" },
-  cal9: { en: "9. The 80–120% range means:", lo: "9. ໄລຍະ 80–120% ໝາຍຄວາມວ່າແນວໃດ?" },
-  cal10: { en: "10. Is the 80–120% range fixed?", lo: "10. ໄລຍະ 80–120% ແມ່ນຕາຍຕົວບໍ່?" },
-  cal11: { en: "11. A consistency ratio of 200% indicates:", lo: "11. ອັດຕາສ່ວນຄວາມສອດຄ່ອງ 200% ຊີ້ໃຫ້ເຫັນວ່າ:" },
-  cal12: { en: "12. If outside acceptable range, what should be done?", lo: "12. ຖ້າຢູ່ນອກຂອບເຂດທີ່ຍອມຮັບໄດ້, ຄວນເຮັດແນວໃດ?" },
-  cal13: { en: "13. During feedback, supervisors should:", lo: "13. ໃນລະຫວ່າງການໃຫ້ຄຳຕິຊົມ, ຜູ້ຊີ້້ນຳຄວນ:" },
-  cal14: { en: "14. RDQA focuses only on data accuracy.", lo: "14. RDQA ເນັ້ນໜັກສະເພາະຄວາມຖືກຕ້ອງຂອງຂໍ້ມູນເທົ່ານັ້ນ." },
-  cal15: { en: "15. RDQA findings should lead to action planning.", lo: "15. ຜົນການຄົ້ນພົບ RDQA ຄວນນຳໄປສູ່ການວາງແຜນປະຕິບັດ." },
-};
-
-// Generate Mock Data for initial view
-const generateMockData = () => {
-  const provinces = ['Vientiane Capital', 'Salavan', 'Luang Prabang', 'Savannakhet', 'Champasak'];
-  const testTypes = ['Pre-test', 'Post-test'];
-  const genders = ['Male', 'Female'];
-  const dates = ['2026-04-27', '2026-04-28', '2026-05-10', '2026-05-12'];
-  
-  let data = [];
-  for (let i = 0; i < 200; i++) {
-    let row = {
-      'Date:': dates[Math.floor(Math.random() * dates.length)],
-      'province location': provinces[Math.floor(Math.random() * provinces.length)],
-      'Gender': genders[Math.floor(Math.random() * genders.length)],
-      'Is this pre or post test?': testTypes[i % 2], // Ensuring balance
-    };
+<!DOCTYPE html>
+<html lang="lo">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RDQA Pre/Post Test Dashboard</title>
     
-    let totalcal = 0;
-    // Post test generally has higher scores
-    const isPost = row['Is this pre or post test?'] === 'Post-test';
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    for (let c = 1; c <= 15; c++) {
-      // Base probability for correct answer. 
-      // Cal 12, 13, 14 are notoriously harder in our mock scenario
-      let prob = isPost ? 0.8 : 0.4;
-      if (c >= 12) prob -= 0.2; 
-      
-      const val = Math.random() < prob ? '1' : '0';
-      row[`cal${c}`] = val;
-      totalcal += parseInt(val);
-    }
-    row['totalcal'] = totalcal.toString();
-    data.push(row);
-  }
-  return data;
-};
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Icons & Excel Library -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-
-export default function App() {
-  const [lang, setLang] = useState('lo');
-  const [rawData, setRawData] = useState([]);
-  const [filters, setFilters] = useState({ province: 'All', month: 'All' });
-
-  // Initialize with mock data and dynamically load SheetJS script
-  useEffect(() => {
-    setRawData(generateMockData());
-
-    // Load XLSX from CDN dynamically to avoid bundler issues
-    if (typeof window !== 'undefined' && !window.XLSX) {
-      const script = document.createElement('script');
-      script.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
-      script.async = true;
-      document.body.appendChild(script);
-    }
-  }, []);
-
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (!window.XLSX) {
-        alert(lang === 'lo' ? "ລະບົບກຳລັງໂຫຼດຕົວອ່ານໄຟລ໌ Excel, ກະລຸນາລອງໃໝ່ອີກຄັ້ງໃນໜຶ່ງວິນາທີ." : "Excel library is still loading, please try again in a moment.");
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const data = new Uint8Array(event.target.result);
-          const workbook = window.XLSX.read(data, { type: 'array' });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          const parsedData = window.XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: "" });
-          
-          setRawData(parsedData);
-          setFilters({ province: 'All', month: 'All' }); // Reset filters on new upload
-        } catch (error) {
-          console.error("Error reading file:", error);
-          alert(lang === 'lo' ? "ເກີດຂໍ້ຜິດພາດໃນການອ່ານໄຟລ໌. ກະລຸນາກວດສອບວ່າເປັນໄຟລ໌ Excel ທີ່ຖືກຕ້ອງຫຼືບໍ່." : "Error reading file. Please make sure it is a valid Excel file.");
+    <style>
+        body {
+            font-family: 'Noto Sans Lao', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
         }
-      };
-      reader.readAsArrayBuffer(file);
-    }
-  };
+    </style>
+</head>
+<body class="text-slate-800">
 
-  // --- Data Processing ---
-  const { filteredData, uniqueProvinces, uniqueMonths } = useMemo(() => {
-    let uniqueProvinces = new Set();
-    let uniqueMonths = new Set();
-    
-    let filtered = rawData.filter(row => {
-      // Extract province
-      let prov = row['province location'];
-      if (prov) uniqueProvinces.add(prov);
-      
-      // Extract month from Date (Format: YYYY-MM-DD -> YYYY-MM)
-      let dateVal = row['Date:'];
-      let month = dateVal ? dateVal.substring(0, 7) : '';
-      if (month) uniqueMonths.add(month);
+    <!-- Hidden File Input to preserve state across renders -->
+    <input type="file" id="hidden-file-input" accept=".xlsx, .xls" class="hidden" />
 
-      // Apply Filters
-      let passProv = filters.province === 'All' || prov === filters.province;
-      let passMonth = filters.month === 'All' || month === filters.month;
+    <!-- Main App Container -->
+    <div id="root" class="min-h-screen p-4 md:p-8"></div>
 
-      return passProv && passMonth;
-    });
+    <script>
+        // --- Translations ---
+        const t = {
+            en: {
+                title: "Pre/Post Test Analysis Dashboard (RDQA)",
+                uploadData: "Upload Excel Data",
+                uploadDesc: "Click the button below to select your Excel file",
+                filters: "Filters",
+                allProvinces: "All Provinces",
+                allMonths: "All Months",
+                province: "Province",
+                month: "Month",
+                kpiTotal: "Total Responses",
+                kpiGender: "Gender Breakdown",
+                kpiTestType: "Pre / Post Breakdown",
+                kpiScore: "Average Score",
+                male: "Male",
+                female: "Female",
+                preTest: "Pre-test",
+                postTest: "Post-test",
+                tableTitle: "Detailed Analysis by Question",
+                questionDesc: "Question Description",
+                preScore: "Pre Score",
+                postScore: "Post Score",
+                diff: "Improvement",
+                weaknessesTitle: "Top 3 Weaknesses & Recommendations for Field Supervision",
+                recommendationAction: "Action / Recommendation:",
+                recs: [
+                    "Provide refresher training and practical exercises.",
+                    "Include this specific topic in the next field supportive supervision checklist.",
+                    "Identify the root cause during the next site visit and mentor staff on-site."
+                ]
+            },
+            lo: {
+                title: "ແດຊບອດວິເຄາະຜົນການປະເມີນ ກ່ອນ-ຫຼັງ (RDQA)",
+                uploadData: "ອັບໂຫຼດຂໍ້ມູນ Excel",
+                uploadDesc: "ກົດປຸ່ມດ້ານລຸ່ມເພື່ອເລືອກໄຟລ໌ Excel ຂອງທ່ານ",
+                filters: "ຕົວຕອງຂໍ້ມູນ",
+                allProvinces: "ທຸກແຂວງ",
+                allMonths: "ທຸກເດືອນ",
+                province: "ແຂວງ",
+                month: "ເດືອນ",
+                kpiTotal: "ຈຳນວນຜູ້ຕອບທັງໝົດ",
+                kpiGender: "ແຍກຕາມເພດ",
+                kpiTestType: "ແຍກກ່ອນ ແລະ ຫຼັງ",
+                kpiScore: "ຄະແນນສະເລ່ຍ",
+                male: "ຊາຍ",
+                female: "ຍິງ",
+                preTest: "Pre-test",
+                postTest: "Post-test",
+                tableTitle: "ຕາຕະລາງວິເຄາະລາຍລະອຽດແຕ່ລະຄຳຖາມ",
+                questionDesc: "ເນື້ອໃນຄຳຖາມ",
+                preScore: "ກ່ອນ (Pre)",
+                postScore: "ຫຼັງ (Post)",
+                diff: "ການພັດທະນາ",
+                weaknessesTitle: "3 ຈຸດອ່ອນທີ່ຄວນປັບປຸງ ແລະ ຄຳແນະນຳສຳລັບລົງຊຸກຍູ້ພາກສະໜາມ",
+                recommendationAction: "ຂໍ້ແນະນຳ / ສິ່ງທີ່ຕ້ອງເຮັດ:",
+                recs: [
+                    "ຈັດຝຶກອົບຮົມທົບທວນຄືນ (Refresher training) ແລະ ເຮັດບົດຝຶກຫັດຕົວຈິງຫຼາຍຂຶ້ນ.",
+                    "ເພີ່ມຫົວຂໍ້ນີ້ເຂົ້າໃນໃບກວດກາ (Checklist) ສຳລັບການລົງຊຸກຍູ້ພາກສະໜາມຄັ້ງຕໍ່ໄປ.",
+                    "ຊອກຫາສາເຫດຫຼັກໃນເວລາລົງພາກສະໜາມ ແລະ ແນະນຳພະນັກງານແບບຈັບມືເຮັດ (On-site mentoring)."
+                ]
+            }
+        };
 
-    return {
-      filteredData: filtered,
-      uniqueProvinces: Array.from(uniqueProvinces).sort(),
-      uniqueMonths: Array.from(uniqueMonths).sort()
-    };
-  }, [rawData, filters]);
+        // --- Question Mapping ---
+        const questionsMap = {
+            cal1: { en: "1. What is the main purpose of RDQA?", lo: "1. ຈຸດປະສົງຫຼັກຂອງ RDQA ແມ່ນຫຍັງ?" },
+            cal2: { en: "2. If you see a #SPILL! error in a cell, what is the most likely cause?", lo: "2. ຖ້າເຫັນຂໍ້ຜິດພາດ #SPILL! ໃນຊ່ອງ, ສາເຫດທີ່ເປັນໄປໄດ້ທີ່ສຸດແມ່ນຫຍັງ?" },
+            cal3: { en: "3. Who should lead the action to address issue in RDQA?", lo: "3. ໃຜຄວນເປັນຜູ້ນຳໃນການແກ້ໄຂບັນຫາໃນ RDQA?" },
+            cal4: { en: "4. Data verification compares:", lo: "4. ການກວດສອບຂໍ້ມູນປຽບທຽບລະຫວ່າງ:" },
+            cal5: { en: "5. Which of the following is NOT a data quality dimension?", lo: "5. ຂໍ້ໃດຕໍ່ໄປນີ້ບໍ່ແມ່ນມິຕິຄຸນນະພາບຂໍ້ມູນ?" },
+            cal6: { en: "6. The RDQA checklist is used to assess:", lo: "6. ໃບກວດກາ RDQA ຖືກນຳໃຊ້ເພື່ອປະເມີນຫຍັງ?" },
+            cal7: { en: "7. In RDQA, data consistency refers to:", lo: "7. ໃນ RDQA, ຄວາມສອດຄ່ອງຂອງຂໍ້ມູນໝາຍເຖິງຫຍັງ?" },
+            cal8: { en: "8. What is the most appropriate action when source documents are missing?", lo: "8. ສິ່ງທີ່ຄວນເຮັດທີ່ສຸດເມື່ອເອກະສານອ້າງອີງສູນຫາຍແມ່ນຫຍັງ?" },
+            cal9: { en: "9. The 80–120% range means:", lo: "9. ໄລຍະ 80–120% ໝາຍຄວາມວ່າແນວໃດ?" },
+            cal10: { en: "10. Is the 80–120% range fixed?", lo: "10. ໄລຍະ 80–120% ແມ່ນຕາຍຕົວບໍ່?" },
+            cal11: { en: "11. A consistency ratio of 200% indicates:", lo: "11. ອັດຕາສ່ວນຄວາມສອດຄ່ອງ 200% ຊີ້ໃຫ້ເຫັນວ່າ:" },
+            cal12: { en: "12. If outside acceptable range, what should be done?", lo: "12. ຖ້າຢູ່ນອກຂອບເຂດທີ່ຍອມຮັບໄດ້, ຄວນເຮັດແນວໃດ?" },
+            cal13: { en: "13. During feedback, supervisors should:", lo: "13. ໃນລະຫວ່າງການໃຫ້ຄຳຕິຊົມ, ຜູ້ຊີ້້ນຳຄວນ:" },
+            cal14: { en: "14. RDQA focuses only on data accuracy.", lo: "14. RDQA ເນັ້ນໜັກສະເພາະຄວາມຖືກຕ້ອງຂອງຂໍ້ມູນເທົ່ານັ້ນ." },
+            cal15: { en: "15. RDQA findings should lead to action planning.", lo: "15. ຜົນການຄົ້ນພົບ RDQA ຄວນນຳໄປສູ່ການວາງແຜນປະຕິບັດ." },
+        };
 
-  // --- KPI Calculations ---
-  const kpis = useMemo(() => {
-    let total = filteredData.length;
-    let male = 0, female = 0;
-    let preTest = 0, postTest = 0;
-    let preScoreTotal = 0, postScoreTotal = 0;
+        // --- App State ---
+        let state = {
+            lang: 'lo',
+            rawData: [],
+            filters: { province: 'All', month: 'All' }
+        };
 
-    filteredData.forEach(row => {
-      if (row['Gender'] === 'Male') male++;
-      else if (row['Gender'] === 'Female') female++;
-
-      const score = parseInt(row['totalcal']) || 0;
-      const type = row['Is this pre or post test?'];
-
-      if (type === 'Pre-test') {
-        preTest++;
-        preScoreTotal += score;
-      } else if (type === 'Post-test') {
-        postTest++;
-        postScoreTotal += score;
-      }
-    });
-
-    return {
-      total,
-      male,
-      female,
-      preTest,
-      postTest,
-      avgPreScore: preTest > 0 ? ((preScoreTotal / preTest) / 15 * 100).toFixed(1) : 0,
-      avgPostScore: postTest > 0 ? ((postScoreTotal / postTest) / 15 * 100).toFixed(1) : 0,
-    };
-  }, [filteredData]);
-
-  // --- Question Analysis ---
-  const questionStats = useMemo(() => {
-    let stats = [];
-    
-    for (let i = 1; i <= 15; i++) {
-      let calId = `cal${i}`;
-      let preCorrect = 0, preTotal = 0;
-      let postCorrect = 0, postTotal = 0;
-
-      filteredData.forEach(row => {
-        const type = row['Is this pre or post test?'];
-        const val = parseInt(row[calId]) || 0;
-        
-        if (type === 'Pre-test') {
-          preTotal++;
-          preCorrect += val;
-        } else if (type === 'Post-test') {
-          postTotal++;
-          postCorrect += val;
+        // --- Mock Data Generator ---
+        function generateMockData() {
+            const provinces = ['Vientiane Capital', 'Salavan', 'Luang Prabang', 'Savannakhet', 'Champasak'];
+            const testTypes = ['Pre-test', 'Post-test'];
+            const genders = ['Male', 'Female'];
+            const dates = ['2026-04-27', '2026-04-28', '2026-05-10', '2026-05-12'];
+            
+            let data = [];
+            for (let i = 0; i < 200; i++) {
+                let row = {
+                    'Date:': dates[Math.floor(Math.random() * dates.length)],
+                    'province location': provinces[Math.floor(Math.random() * provinces.length)],
+                    'Gender': genders[Math.floor(Math.random() * genders.length)],
+                    'Is this pre or post test?': testTypes[i % 2],
+                };
+                
+                let totalcal = 0;
+                const isPost = row['Is this pre or post test?'] === 'Post-test';
+                
+                for (let c = 1; c <= 15; c++) {
+                    let prob = isPost ? 0.8 : 0.4;
+                    if (c >= 12) prob -= 0.2; 
+                    
+                    const val = Math.random() < prob ? '1' : '0';
+                    row[`cal${c}`] = val;
+                    totalcal += parseInt(val);
+                }
+                row['totalcal'] = totalcal.toString();
+                data.push(row);
+            }
+            return data;
         }
-      });
 
-      let prePct = preTotal > 0 ? (preCorrect / preTotal * 100) : 0;
-      let postPct = postTotal > 0 ? (postCorrect / postTotal * 100) : 0;
+        // --- Core Functions ---
+        function toggleLang() {
+            state.lang = state.lang === 'lo' ? 'en' : 'lo';
+            render();
+        }
 
-      stats.push({
-        id: calId,
-        en: questionsMap[calId].en,
-        lo: questionsMap[calId].lo,
-        preScore: parseFloat(prePct.toFixed(1)),
-        postScore: parseFloat(postPct.toFixed(1)),
-        diff: parseFloat((postPct - prePct).toFixed(1))
-      });
-    }
-    return stats;
-  }, [filteredData]);
+        function setFilter(type, value) {
+            state.filters[type] = value;
+            render();
+        }
 
-  // --- Top 3 Weaknesses ---
-  const weaknesses = useMemo(() => {
-    // Sort by lowest post-test score
-    return [...questionStats].sort((a, b) => a.postScore - b.postScore).slice(0, 3);
-  }, [questionStats]);
+        function triggerFileInput() {
+            document.getElementById('hidden-file-input').click();
+        }
 
-  const currentT = t[lang];
+        // --- Process Data ---
+        function getProcessedData() {
+            let uniqueProvinces = new Set();
+            let uniqueMonths = new Set();
+            
+            let filtered = state.rawData.filter(row => {
+                let prov = row['province location'];
+                if (prov) uniqueProvinces.add(prov);
+                
+                let dateVal = row['Date:'];
+                let month = dateVal ? dateVal.substring(0, 7) : '';
+                if (month) uniqueMonths.add(month);
 
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 p-4 md:p-8" style={{ fontFamily: "'Noto Sans Lao', sans-serif" }}>
-      <style>
-        {`
-          @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@300;400;500;600;700&display=swap');
-          
-          /* ບັງຄັບໃຫ້ກຣາບ Recharts ໃຊ້ Font Noto Sans Lao ນຳ */
-          .recharts-text {
-            font-family: 'Noto Sans Lao', sans-serif !important;
-          }
-        `}
-      </style>
-      
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-        <h1 className="text-2xl font-bold text-blue-900 flex items-center gap-2">
-          <FileText className="text-blue-600" />
-          {currentT.title}
-        </h1>
-        <button 
-          onClick={() => setLang(lang === 'lo' ? 'en' : 'lo')}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors font-semibold"
-        >
-          <Languages size={18} />
-          {lang === 'lo' ? 'English' : 'ພາສາລາວ'}
-        </button>
-      </div>
+                let passProv = state.filters.province === 'All' || prov === state.filters.province;
+                let passMonth = state.filters.month === 'All' || month === state.filters.month;
 
-      {/* Controls: Upload & Filters */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Upload Card */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 lg:col-span-1 flex flex-col justify-center">
-          <h2 className="text-lg font-semibold mb-2 text-slate-700">{currentT.uploadData}</h2>
-          <p className="text-sm text-slate-500 mb-5">{currentT.uploadDesc}</p>
-          <label className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg cursor-pointer transition-all shadow-sm active:scale-95">
-            <Upload size={18} />
-            {currentT.uploadData}
-            <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileUpload} />
-          </label>
-        </div>
+                return passProv && passMonth;
+            });
 
-        {/* Filters Card */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 lg:col-span-2">
-          <h2 className="text-lg font-semibold mb-4 text-slate-700">{currentT.filters}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">{currentT.province}</label>
-              <select 
-                className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                value={filters.province}
-                onChange={(e) => setFilters({...filters, province: e.target.value})}
-              >
-                <option value="All">{currentT.allProvinces}</option>
-                {uniqueProvinces.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">{currentT.month}</label>
-              <select 
-                className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                value={filters.month}
-                onChange={(e) => setFilters({...filters, month: e.target.value})}
-              >
-                <option value="All">{currentT.allMonths}</option>
-                {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
+            // KPIs
+            let kpis = { total: filtered.length, male: 0, female: 0, preTest: 0, postTest: 0, avgPreScore: 0, avgPostScore: 0 };
+            let preScoreTotal = 0, postScoreTotal = 0;
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {/* Total */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
-          <div className="p-4 bg-blue-100 text-blue-600 rounded-full">
-            <Users size={24} />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-500">{currentT.kpiTotal}</p>
-            <p className="text-2xl font-bold text-slate-800">{kpis.total}</p>
-          </div>
-        </div>
+            filtered.forEach(row => {
+                if (row['Gender'] === 'Male') kpis.male++;
+                else if (row['Gender'] === 'Female') kpis.female++;
 
-        {/* Gender */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
-          <div className="p-4 bg-purple-100 text-purple-600 rounded-full">
-            <Users size={24} />
-          </div>
-          <div className="w-full">
-            <p className="text-sm font-medium text-slate-500 mb-1">{currentT.kpiGender}</p>
-            <div className="flex justify-between text-sm">
-              <span className="font-semibold text-slate-700">{currentT.male}: {kpis.male}</span>
-              <span className="font-semibold text-slate-700">{currentT.female}: {kpis.female}</span>
-            </div>
-            <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2">
-              <div className="bg-purple-500 h-1.5 rounded-full" style={{ width: `${kpis.total ? (kpis.male/kpis.total)*100 : 0}%` }}></div>
-            </div>
-          </div>
-        </div>
+                const score = parseInt(row['totalcal']) || 0;
+                const type = row['Is this pre or post test?'];
 
-        {/* Pre/Post Count */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
-          <div className="p-4 bg-orange-100 text-orange-600 rounded-full">
-            <FileText size={24} />
-          </div>
-          <div className="w-full">
-            <p className="text-sm font-medium text-slate-500 mb-1">{currentT.kpiTestType}</p>
-            <div className="flex justify-between text-sm">
-              <span className="font-semibold text-slate-700">Pre: {kpis.preTest}</span>
-              <span className="font-semibold text-slate-700">Post: {kpis.postTest}</span>
-            </div>
-             <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2 flex">
-              <div className="bg-orange-400 h-1.5 rounded-l-full" style={{ width: `${kpis.total ? (kpis.preTest/kpis.total)*100 : 0}%` }}></div>
-              <div className="bg-orange-600 h-1.5 rounded-r-full" style={{ width: `${kpis.total ? (kpis.postTest/kpis.total)*100 : 0}%` }}></div>
-            </div>
-          </div>
-        </div>
+                if (type === 'Pre-test') {
+                    kpis.preTest++;
+                    preScoreTotal += score;
+                } else if (type === 'Post-test') {
+                    kpis.postTest++;
+                    postScoreTotal += score;
+                }
+            });
 
-        {/* Average Scores */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
-          <div className="p-4 bg-emerald-100 text-emerald-600 rounded-full">
-            <Percent size={24} />
-          </div>
-          <div className="w-full">
-            <p className="text-sm font-medium text-slate-500 mb-1">{currentT.kpiScore} (Avg)</p>
-            <div className="flex justify-between items-end">
-              <div>
-                <span className="text-xs text-slate-400 block">{currentT.preTest}</span>
-                <span className="font-bold text-slate-700">{kpis.avgPreScore}%</span>
-              </div>
-              <ArrowRight className="text-slate-300" size={16} />
-              <div className="text-right">
-                <span className="text-xs text-slate-400 block">{currentT.postTest}</span>
-                <span className="font-bold text-emerald-600">{kpis.avgPostScore}%</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+            kpis.avgPreScore = kpis.preTest > 0 ? ((preScoreTotal / kpis.preTest) / 15 * 100).toFixed(1) : 0;
+            kpis.avgPostScore = kpis.postTest > 0 ? ((postScoreTotal / kpis.postTest) / 15 * 100).toFixed(1) : 0;
 
-      {/* Table Section */}
-      <div className="mb-8">
-        {/* Detail Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
-          <div className="p-6 border-b border-slate-100">
-            <h2 className="text-lg font-semibold text-slate-700">{currentT.tableTitle}</h2>
-          </div>
-          <div className="overflow-x-auto overflow-y-auto flex-1 max-h-[500px]">
-            <table className="w-full text-left text-sm text-slate-600">
-              <thead className="text-xs text-slate-500 uppercase bg-slate-50 sticky top-0 z-10">
-                <tr>
-                  <th className="px-4 py-3 min-w-[250px]">{currentT.questionDesc}</th>
-                  <th className="px-4 py-3 text-center">{currentT.preScore}</th>
-                  <th className="px-4 py-3 text-center">{currentT.postScore}</th>
-                  <th className="px-4 py-3 text-center">{currentT.diff}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {questionStats.map((q, index) => (
-                  <tr key={q.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3">{lang === 'lo' ? q.lo : q.en}</td>
-                    <td className="px-4 py-3 text-center">{q.preScore}%</td>
-                    <td className="px-4 py-3 text-center font-semibold text-emerald-600">{q.postScore}%</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${q.diff >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                        {q.diff > 0 ? '+' : ''}{q.diff}%
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+            // Stats
+            let stats = [];
+            for (let i = 1; i <= 15; i++) {
+                let calId = `cal${i}`;
+                let preCorrect = 0, preTotal = 0;
+                let postCorrect = 0, postTotal = 0;
 
-      {/* Weaknesses & Recommendations */}
-      <div className="bg-red-50 border border-red-100 p-6 rounded-xl shadow-sm">
-        <h2 className="text-lg font-bold text-red-800 mb-4 flex items-center gap-2">
-          <AlertCircle size={20} />
-          {currentT.weaknessesTitle}
-        </h2>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {weaknesses.map((w, idx) => (
-            <div key={w.id} className="bg-white p-5 rounded-lg border border-red-100 shadow-sm">
-              <div className="flex justify-between items-start mb-3">
-                <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded">Rank #{idx + 1}</span>
-                <span className="text-red-600 font-bold">{w.postScore}% Post-score</span>
-              </div>
-              <p className="font-semibold text-slate-800 mb-1 text-sm">{w.id}</p>
-              <p className="text-sm text-slate-600 mb-4 h-16 overflow-hidden line-clamp-3">
-                {lang === 'lo' ? w.lo : w.en}
-              </p>
-              <div className="pt-3 border-t border-slate-100">
-                <p className="text-xs font-semibold text-slate-500 mb-2">{currentT.recommendationAction}</p>
-                <div className="flex items-start gap-2">
-                  <CheckCircle size={16} className="text-emerald-500 mt-0.5 shrink-0" />
-                  <p className="text-sm text-slate-700">
-                    {currentT.recs[idx]}
-                  </p>
+                filtered.forEach(row => {
+                    const type = row['Is this pre or post test?'];
+                    const val = parseInt(row[calId]) || 0;
+                    if (type === 'Pre-test') { preTotal++; preCorrect += val; }
+                    else if (type === 'Post-test') { postTotal++; postCorrect += val; }
+                });
+
+                let prePct = preTotal > 0 ? (preCorrect / preTotal * 100) : 0;
+                let postPct = postTotal > 0 ? (postCorrect / postTotal * 100) : 0;
+
+                stats.push({
+                    id: calId,
+                    en: questionsMap[calId].en,
+                    lo: questionsMap[calId].lo,
+                    preScore: parseFloat(prePct.toFixed(1)),
+                    postScore: parseFloat(postPct.toFixed(1)),
+                    diff: parseFloat((postPct - prePct).toFixed(1))
+                });
+            }
+
+            let weaknesses = [...stats].sort((a, b) => a.postScore - b.postScore).slice(0, 3);
+
+            return { 
+                filtered, 
+                uniqueProvinces: Array.from(uniqueProvinces).sort(), 
+                uniqueMonths: Array.from(uniqueMonths).sort(), 
+                kpis, 
+                stats, 
+                weaknesses 
+            };
+        }
+
+        // --- Render UI ---
+        function render() {
+            const currentT = t[state.lang];
+            const data = getProcessedData();
+            
+            // Build Provinces Options
+            let provOptions = `<option value="All">${currentT.allProvinces}</option>`;
+            data.uniqueProvinces.forEach(p => {
+                provOptions += `<option value="${p}" ${state.filters.province === p ? 'selected' : ''}>${p}</option>`;
+            });
+
+            // Build Months Options
+            let monthOptions = `<option value="All">${currentT.allMonths}</option>`;
+            data.uniqueMonths.forEach(m => {
+                monthOptions += `<option value="${m}" ${state.filters.month === m ? 'selected' : ''}>${m}</option>`;
+            });
+
+            // Build Table Rows
+            let tableRows = '';
+            data.stats.forEach(q => {
+                let diffBadgeClass = q.diff >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700';
+                let diffSign = q.diff > 0 ? '+' : '';
+                tableRows += `
+                    <tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                        <td class="px-4 py-3">${state.lang === 'lo' ? q.lo : q.en}</td>
+                        <td class="px-4 py-3 text-center">${q.preScore}%</td>
+                        <td class="px-4 py-3 text-center font-semibold text-emerald-600">${q.postScore}%</td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="px-2 py-1 rounded-full text-xs font-semibold ${diffBadgeClass}">
+                                ${diffSign}${q.diff}%
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // Build Weaknesses
+            let weakHTML = '';
+            data.weaknesses.forEach((w, idx) => {
+                weakHTML += `
+                    <div class="bg-white p-5 rounded-lg border border-red-100 shadow-sm">
+                        <div class="flex justify-between items-start mb-3">
+                            <span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded">Rank #${idx + 1}</span>
+                            <span class="text-red-600 font-bold">${w.postScore}% Post-score</span>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4 h-16 overflow-hidden line-clamp-3">
+                            ${state.lang === 'lo' ? w.lo : w.en}
+                        </p>
+                        <div class="pt-3 border-t border-slate-100">
+                            <p class="text-xs font-semibold text-slate-500 mb-2">${currentT.recommendationAction}</p>
+                            <div class="flex items-start gap-2">
+                                <i data-lucide="check-circle" class="text-emerald-500 mt-0.5 shrink-0 w-4 h-4"></i>
+                                <p class="text-sm text-slate-700">${currentT.recs[idx]}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Calculate progress bars
+            const malePct = data.kpis.total ? (data.kpis.male / data.kpis.total) * 100 : 0;
+            const prePct = data.kpis.total ? (data.kpis.preTest / data.kpis.total) * 100 : 0;
+            const postPct = data.kpis.total ? (data.kpis.postTest / data.kpis.total) * 100 : 0;
+
+            const html = `
+                <!-- Header -->
+                <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                    <h1 class="text-2xl font-bold text-blue-900 flex items-center gap-2">
+                        <i data-lucide="file-text" class="text-blue-600 w-6 h-6"></i>
+                        ${currentT.title}
+                    </h1>
+                    <button onclick="toggleLang()" class="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors font-semibold">
+                        <i data-lucide="languages" class="w-4 h-4"></i>
+                        ${state.lang === 'lo' ? 'English' : 'ພາສາລາວ'}
+                    </button>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
 
-    </div>
-  );
-}
+                <!-- Controls: Upload & Filters -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 lg:col-span-1 flex flex-col justify-center">
+                        <h2 class="text-lg font-semibold mb-2 text-slate-700">${currentT.uploadData}</h2>
+                        <p class="text-sm text-slate-500 mb-5">${currentT.uploadDesc}</p>
+                        <button onclick="triggerFileInput()" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg cursor-pointer transition-all shadow-sm active:scale-95 w-max">
+                            <i data-lucide="upload" class="w-4 h-4"></i>
+                            ${currentT.uploadData}
+                        </button>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 lg:col-span-2">
+                        <h2 class="text-lg font-semibold mb-4 text-slate-700">${currentT.filters}</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 mb-1">${currentT.province}</label>
+                                <select onchange="setFilter('province', this.value)" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                                    ${provOptions}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 mb-1">${currentT.month}</label>
+                                <select onchange="setFilter('month', this.value)" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                                    ${monthOptions}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KPI Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <!-- Total -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
+                        <div class="p-4 bg-blue-100 text-blue-600 rounded-full">
+                            <i data-lucide="users" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-slate-500">${currentT.kpiTotal}</p>
+                            <p class="text-2xl font-bold text-slate-800">${data.kpis.total}</p>
+                        </div>
+                    </div>
+
+                    <!-- Gender -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
+                        <div class="p-4 bg-purple-100 text-purple-600 rounded-full">
+                            <i data-lucide="users" class="w-6 h-6"></i>
+                        </div>
+                        <div class="w-full">
+                            <p class="text-sm font-medium text-slate-500 mb-1">${currentT.kpiGender}</p>
+                            <div class="flex justify-between text-sm">
+                                <span class="font-semibold text-slate-700">${currentT.male}: ${data.kpis.male}</span>
+                                <span class="font-semibold text-slate-700">${currentT.female}: ${data.kpis.female}</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-1.5 mt-2">
+                                <div class="bg-purple-500 h-1.5 rounded-full" style="width: ${malePct}%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pre/Post -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
+                        <div class="p-4 bg-orange-100 text-orange-600 rounded-full">
+                            <i data-lucide="file-text" class="w-6 h-6"></i>
+                        </div>
+                        <div class="w-full">
+                            <p class="text-sm font-medium text-slate-500 mb-1">${currentT.kpiTestType}</p>
+                            <div class="flex justify-between text-sm">
+                                <span class="font-semibold text-slate-700">Pre: ${data.kpis.preTest}</span>
+                                <span class="font-semibold text-slate-700">Post: ${data.kpis.postTest}</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-1.5 mt-2 flex">
+                                <div class="bg-orange-400 h-1.5 rounded-l-full" style="width: ${prePct}%"></div>
+                                <div class="bg-orange-600 h-1.5 rounded-r-full" style="width: ${postPct}%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Scores -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
+                        <div class="p-4 bg-emerald-100 text-emerald-600 rounded-full">
+                            <i data-lucide="percent" class="w-6 h-6"></i>
+                        </div>
+                        <div class="w-full">
+                            <p class="text-sm font-medium text-slate-500 mb-1">${currentT.kpiScore} (Avg)</p>
+                            <div class="flex justify-between items-end">
+                                <div>
+                                    <span class="text-xs text-slate-400 block">${currentT.preTest}</span>
+                                    <span class="font-bold text-slate-700">${data.kpis.avgPreScore}%</span>
+                                </div>
+                                <i data-lucide="arrow-right" class="text-slate-300 w-4 h-4 mb-1"></i>
+                                <div class="text-right">
+                                    <span class="text-xs text-slate-400 block">${currentT.postTest}</span>
+                                    <span class="font-bold text-emerald-600">${data.kpis.avgPostScore}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table Section -->
+                <div class="mb-8">
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
+                        <div class="p-6 border-b border-slate-100">
+                            <h2 class="text-lg font-semibold text-slate-700">${currentT.tableTitle}</h2>
+                        </div>
+                        <div class="overflow-x-auto overflow-y-auto flex-1 max-h-[500px]">
+                            <table class="w-full text-left text-sm text-slate-600">
+                                <thead class="text-xs text-slate-500 uppercase bg-slate-50 sticky top-0 z-10">
+                                    <tr>
+                                        <th class="px-4 py-3 min-w-[250px]">${currentT.questionDesc}</th>
+                                        <th class="px-4 py-3 text-center">${currentT.preScore}</th>
+                                        <th class="px-4 py-3 text-center">${currentT.postScore}</th>
+                                        <th class="px-4 py-3 text-center">${currentT.diff}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${tableRows}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Weaknesses Section -->
+                <div class="bg-red-50 border border-red-100 p-6 rounded-xl shadow-sm">
+                    <h2 class="text-lg font-bold text-red-800 mb-4 flex items-center gap-2">
+                        <i data-lucide="alert-circle" class="w-5 h-5"></i>
+                        ${currentT.weaknessesTitle}
+                    </h2>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        ${weakHTML}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('root').innerHTML = html;
+            
+            // Re-initialize Lucide Icons after DOM update
+            lucide.createIcons();
+        }
+
+        // --- File Upload Listener ---
+        document.getElementById('hidden-file-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (typeof XLSX === 'undefined') {
+                alert(state.lang === 'lo' ? "ລະບົບກຳລັງໂຫຼດຕົວອ່ານໄຟລ໌ Excel, ກະລຸນາລອງໃໝ່ອີກຄັ້ງໃນໜຶ່ງວິນາທີ." : "Excel library is still loading, please try again.");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const data = new Uint8Array(event.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const parsedData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: "" });
+                    
+                    state.rawData = parsedData;
+                    state.filters = { province: 'All', month: 'All' };
+                    
+                    // Clear file input value to allow re-uploading the same file if needed
+                    e.target.value = '';
+                    
+                    render();
+                } catch (error) {
+                    console.error("Error reading file:", error);
+                    alert(state.lang === 'lo' ? "ເກີດຂໍ້ຜິດພາດໃນການອ່ານໄຟລ໌. ກະລຸນາກວດສອບວ່າເປັນໄຟລ໌ Excel ທີ່ຖືກຕ້ອງຫຼືບໍ່." : "Error reading file. Please make sure it is a valid Excel file.");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // --- Initialization ---
+        window.onload = () => {
+            state.rawData = generateMockData();
+            render();
+        };
+
+    </script>
+</body>
+</html>
